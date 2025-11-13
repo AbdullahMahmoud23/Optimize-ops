@@ -11,7 +11,7 @@ function SupervisorDashboard() {
         {/* Header */}
         <div className="mb-6 sm:mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold text-transparent bg-gradient-to-r from-green-700 to-green-500 bg-clip-text">
-            Supervisor Dashboard
+            Manager Dashboard
           </h1>
           <p className="text-gray-500 mt-1 sm:mt-2 text-sm sm:text-base">
             Manage your team and oversee operations

@@ -129,9 +129,9 @@ function Supervisors() {
       {/* Page Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-4xl font-bold">Supervisors Management</h1>
+          <h1 className="text-4xl font-bold">Managers Management</h1>
           <p className="text-base-content/60 mt-2">
-            Manage supervisor accounts
+            Manage manager accounts
           </p>
         </div>
         <button className="btn btn-primary gap-2" onClick={openAddModal}>
@@ -147,7 +147,7 @@ function Supervisors() {
               clipRule="evenodd"
             />
           </svg>
-          Add New Supervisor
+          Add New Manager
         </button>
       </div>
 
@@ -189,7 +189,7 @@ function Supervisors() {
         <span className="font-bold text-base-content">
           {filteredSupervisors.length}
         </span>{" "}
-        supervisors
+        managers
       </div>
 
       {/* Table */}
@@ -279,7 +279,7 @@ function Supervisors() {
               ✕
             </button>
             <h3 className="font-bold text-lg mb-4">
-              {editingId ? "Edit Supervisor" : "Add New Supervisor"}
+              {editingId ? "Edit Manager" : "Add New Manager"}
             </h3>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -352,7 +352,7 @@ function Supervisors() {
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  {editingId ? "Save Changes" : "Add Supervisor"}
+                  {editingId ? "Save Changes" : "Add Manager"}
                 </button>
               </div>
             </form>

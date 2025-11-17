@@ -27,8 +27,6 @@ function Header() {
         return "badge-Accent";
       case "technician":
         return "badge-Neutral";
-      default:
-        return "badge-neutral";
     }
   };
 

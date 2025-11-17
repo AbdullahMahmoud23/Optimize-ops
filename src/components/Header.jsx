@@ -59,11 +59,6 @@ function Header() {
             {roleTitle}
           </div>
         )}
-        {user?.email && (
-          <div className="text-sm text-gray-600 hidden sm:block">
-            {user.email}
-          </div>
-        )}
         <button
           onClick={handleLogout}
           className="btn bg-gradient-to-r from-blue-600 to-blue-400 text-white border-none shadow-md hover:shadow-blue-500/40 hover:scale-105 transition-transform"

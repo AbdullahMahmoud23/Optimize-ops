@@ -129,7 +129,7 @@ function RecordAudio() {
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
                     <tr>
-                      <td className="px-4 py-4 font-semibold text-gray-900">21</td>
+                      <td className="px-4 py-4 font-semibold text-gray-900">Target Text</td>
                       <td className="px-4 py-4 text-gray-600">23</td>
                       <td className="px-4 py-4">
                         <input

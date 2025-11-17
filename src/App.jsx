@@ -10,6 +10,7 @@ import Sidebar from "./components/Sidebar";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard";
 import TechnicianDashboard from "./pages/technician/TechnicianDashboard";
+import RecordAudio from "./pages/technician/RecordAudio";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import Supervisors from "./pages/Supervisors";
@@ -102,8 +103,8 @@ function App() {
     <RoleBasedRoute allowedRoles={["technician"]}>
       <Routes>
         <Route path="dashboard" element={<TechnicianDashboard />} />
-        {/* <Route path="assignments" element={<TechnicianAssignments />} />
-        <Route path="reports" element={<TechnicianReports />} /> */}
+        {/* <Route path="assignments" element={<TechnicianAssignments />/> */}
+        <Route path="record-audio" element={<RecordAudio />} />
         <Route
           path="*"
           element={<Navigate to="/technician/dashboard" replace />}

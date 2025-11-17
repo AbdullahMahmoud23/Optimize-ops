@@ -135,7 +135,7 @@ function TechnicianDashboard() {
               </button>
 
               <button
-                onClick={() => navigate("/technician/reports")}
+                onClick={() => navigate("/technician/record-audio")}
                 className="btn bg-gradient-to-r from-gray-900 to-gray-700 border-none text-white btn-md sm:btn-lg gap-3 hover:scale-[1.02] transition-transform shadow-lg hover:shadow-gray-500/40 rounded-lg w-full"
               ><svg
                   xmlns="http://www.w3.org/2000/svg"

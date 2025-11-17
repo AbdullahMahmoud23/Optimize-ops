@@ -11,7 +11,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard";
 import TechnicianDashboard from "./pages/technician/TechnicianDashboard";
 import RecordAudio from "./pages/technician/RecordAudio";
-import Recordings from "./pages/technician/Recordings";
+import Recordings from "./pages/technician/Recording.jsx";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import Supervisors from "./pages/Supervisors";

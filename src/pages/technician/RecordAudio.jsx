@@ -1,16 +1,40 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useAuth } from "../../context/AuthContext.jsx";
 
 function RecordAudio() {
-  const [selectedShift, setSelectedShift] = useState('Night');
+  const [selectedShift, setSelectedShift] = useState('First');
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10)); // YYYY-MM-DD
+  const { token } = useAuth();
   const [achievementValue, setAchievementValue] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState('0:00');
+  const mediaRecorderRef = useRef(null);
+  const chunksRef = useRef([]);
+  const timerRef = useRef(null);
+  const secondsRef = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      // cleanup media stream if unmounted
+      try {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop();
+        }
+      } catch (e) {}
+      clearInterval(timerRef.current);
+    };
+  }, []);
+
+  const [stepIndex, setStepIndex] = useState(0); // 0: Date, 1: Shift, 2: Targets, 3: Record
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState(null); // null, 'success', 'error'
+  const [submissionMessage, setSubmissionMessage] = useState('');
 
   const stepper = [
-    { label: "Date", status: "done" },
-    { label: "Shift", status: "done" },
-    { label: "Targets", status: "done" },
-    { label: "Record", status: "active" },
+    { label: "Date" },
+    { label: "Shift" },
+    { label: "Targets" },
+    { label: "Record" },
   ];
 
   return (
@@ -27,8 +51,8 @@ function RecordAudio() {
           <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 space-y-6">
             <div className="flex flex-wrap gap-4">
               {stepper.map((step, index) => {
-                const isActive = step.status === "active";
-                const isDone = step.status === "done";
+                const isDone = index < stepIndex;
+                const isActive = index === stepIndex;
                 return (
                   <div key={step.label} className="flex items-center gap-3">
                     <div
@@ -56,10 +80,10 @@ function RecordAudio() {
 
             {/* Status Chips */}
             <div className="flex flex-wrap gap-3">
-              <span className="px-4 py-2 bg-gray-100 text-gray-600 text-sm rounded-full border border-gray-200">Date: 2025-11-14</span>
-              <span className="px-4 py-2 bg-indigo-50 text-indigo-600 text-sm rounded-full border border-indigo-100">Shift: Selected</span>
-              <span className="px-4 py-2 bg-green-50 text-green-600 text-sm rounded-full border border-green-100">Targets: 1 pending / 1</span>
-              <span className="px-4 py-2 bg-amber-50 text-amber-600 text-sm rounded-full border border-amber-100">Record: Awaiting recording</span>
+              <span className="px-4 py-2 bg-gray-100 text-gray-600 text-sm rounded-full border border-gray-200">Date: {date}</span>
+              <span className={`px-4 py-2 ${selectedShift ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-50 text-gray-500'} text-sm rounded-full border border-indigo-100`}>Shift: {selectedShift}</span>
+              <span className="px-4 py-2 bg-green-50 text-green-600 text-sm rounded-full border border-green-100">Targets: {achievementValue ? 'saved' : 'pending'}</span>
+              <span className="px-4 py-2 bg-amber-50 text-amber-600 text-sm rounded-full border border-amber-100">Record: {isRecording ? 'Recording...' : (stepIndex >= 3 ? 'Done' : 'Awaiting recording')}</span>
             </div>
           </div>
         </header>
@@ -73,10 +97,13 @@ function RecordAudio() {
               <div className="text-xs font-semibold text-gray-400 tracking-[0.4em]">DATE</div>
               <div className="relative">
                 <input
-                  type="text"
-                  readOnly
-                  value="14/11/2025"
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 pr-12 text-gray-900 placeholder-gray-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  type="date"
+                  value={date}
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    if (stepIndex === 0) setStepIndex(1);
+                  }}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 pr-12 text-gray-900 placeholder-gray-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                 />
                 <span className="absolute inset-y-0 right-4 flex items-center text-gray-400">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
@@ -90,16 +117,38 @@ function RecordAudio() {
             <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 space-y-4">
               <div className="text-xs font-semibold text-gray-400 tracking-[0.4em]">YOUR SHIFTS</div>
               <div className="flex flex-wrap gap-3">
-                <button 
-                  onClick={() => setSelectedShift('Night')}
+                <button
+                  onClick={() => {
+                    setSelectedShift('First');
+                    if (stepIndex <= 1) setStepIndex(2);
+                  }}
                   className={`px-6 py-3 rounded-full font-semibold shadow transition-colors ${
-                    selectedShift === 'Night' ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                    selectedShift === 'First' ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
                   }`}
                 >
-                  Night
+                  First Shift
                 </button>
-                <button className="px-6 py-3 rounded-full border-2 border-dashed border-gray-300 text-gray-500 hover:border-gray-400 hover:text-gray-600 transition-colors">
-                  Add Shift
+                <button
+                  onClick={() => {
+                    setSelectedShift('Second');
+                    if (stepIndex <= 1) setStepIndex(2);
+                  }}
+                  className={`px-6 py-3 rounded-full font-semibold shadow transition-colors ${
+                    selectedShift === 'Second' ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                  }`}
+                >
+                  Second Shift
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedShift('Third');
+                    if (stepIndex <= 1) setStepIndex(2);
+                  }}
+                  className={`px-6 py-3 rounded-full font-semibold shadow transition-colors ${
+                    selectedShift === 'Third' ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                  }`}
+                >
+                  Third Shift
                 </button>
               </div>
             </div>
@@ -132,13 +181,34 @@ function RecordAudio() {
                       <td className="px-4 py-4 font-semibold text-gray-900">Target Text</td>
                       <td className="px-4 py-4 text-gray-600">23</td>
                       <td className="px-4 py-4">
-                        <input
-                          type="text"
-                          placeholder="Enter achiev"
-                          value={achievementValue}
-                          onChange={(e) => setAchievementValue(e.target.value)}
-                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Enter achiev"
+                            value={achievementValue}
+                            onChange={(e) => setAchievementValue(e.target.value)}
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                          />
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch('http://localhost:3000/api/technician/targets/1/achievement', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json', 'Authorization': token || '' },
+                                  body: JSON.stringify({ achievement: achievementValue })
+                                });
+                                if (!res.ok) throw new Error('Failed to save achievement');
+                                // mark step 3 complete and move to record step
+                                setStepIndex(3);
+                                alert('Achievement saved');
+                              } catch (err) {
+                                console.error(err);
+                                alert(err.message || 'Save failed');
+                              }
+                            }}
+                            className="px-4 py-2 rounded-md bg-green-600 text-white"
+                          >Save</button>
+                        </div>
                       </td>
                       <td className="px-4 py-4">
                         <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-600">
@@ -181,8 +251,73 @@ function RecordAudio() {
                   </div>
 
                   {/* Start Button */}
-                  <button 
-                    onClick={() => setIsRecording(!isRecording)}
+                  <button
+                    onClick={async () => {
+                      if (!isRecording) {
+                        // start recording
+                        try {
+                          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                          mediaRecorderRef.current = new MediaRecorder(stream);
+                          chunksRef.current = [];
+                          mediaRecorderRef.current.ondataavailable = (e) => {
+                            if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+                          };
+                          mediaRecorderRef.current.onstop = async () => {
+                            // assemble blob and upload
+                            const blob = new Blob(chunksRef.current, { type: chunksRef.current[0]?.type || 'audio/webm' });
+                            const filename = `recording_${Date.now()}.webm`;
+                            const file = new File([blob], filename, { type: blob.type });
+                            const fd = new FormData();
+                            fd.append('audio', file);
+                            fd.append('shift', selectedShift);
+                            fd.append('type', 'excuse');
+                            fd.append('date', date);
+
+                            try {
+                              const resp = await fetch('http://localhost:3000/api/recordings', {
+                                method: 'POST',
+                                headers: { 'Authorization': token || '' },
+                                body: fd
+                              });
+                              if (!resp.ok) {
+                                const err = await resp.text().catch(() => 'upload failed');
+                                alert('Upload failed: ' + err);
+                              } else {
+                                const j = await resp.json().catch(() => ({}));
+                                alert(j.message || 'Uploaded successfully');
+                                // mark final step complete
+                                setStepIndex(3);
+                              }
+                            } catch (uploadErr) {
+                              console.error('Upload error', uploadErr);
+                              alert('Upload error');
+                            }
+                          };
+                          mediaRecorderRef.current.start();
+                          secondsRef.current = 0;
+                          setRecordingTime('0:00');
+                          timerRef.current = setInterval(() => {
+                            secondsRef.current += 1;
+                            const s = secondsRef.current % 60;
+                            const m = Math.floor(secondsRef.current / 60);
+                            setRecordingTime(`${m}:${s.toString().padStart(2, '0')}`);
+                          }, 1000);
+                          setIsRecording(true);
+                        } catch (err) {
+                          console.error('Could not start recording', err);
+                          alert('Could not start recording: ' + (err.message || err));
+                        }
+                      } else {
+                        // stop recording
+                        try {
+                          if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                            mediaRecorderRef.current.stop();
+                          }
+                        } catch (e) { console.warn(e); }
+                        clearInterval(timerRef.current);
+                        setIsRecording(false);
+                      }
+                    }}
                     className={`w-full inline-flex items-center justify-center gap-2 rounded-2xl font-semibold py-4 text-lg shadow-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] ${
                       isRecording ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-orange-500 hover:bg-orange-600 text-white'
                     }`}
@@ -198,14 +333,83 @@ function RecordAudio() {
           </div>
         </section>
 
-        {/* Submit Button */}
-        <div className="flex justify-end">
-          <button className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2">
-            Submit Recording
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
+        {/* Submit Button & Status */}
+        <div className="space-y-4">
+          {/* Status Message */}
+          {submissionStatus && (
+            <div className={`p-4 rounded-xl text-sm font-semibold ${
+              submissionStatus === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+            }`}>
+              {submissionMessage}
+            </div>
+          )}
+          
+          <div className="flex justify-end">
+            <button 
+              onClick={async () => {
+                setIsSubmitting(true);
+                setSubmissionStatus(null);
+                try {
+                  // Save achievement for a single target (assume TargetID=1 for demo)
+                  const achRes = await fetch('http://localhost:3000/api/technician/targets/1/achievement', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': token || ''
+                    },
+                    body: JSON.stringify({ achievement: achievementValue })
+                  });
+                  if (!achRes.ok) throw new Error('Failed to save achievement');
+
+                  // Create recording metadata (date & shift)
+                  const metaRes = await fetch('http://localhost:3000/api/recordings/metadata', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': token || ''
+                    },
+                    body: JSON.stringify({ shift: selectedShift, type: 'excuse', date })
+                  });
+                  if (!metaRes.ok) {
+                    const err = await metaRes.json().catch(() => ({}));
+                    throw new Error(err.error || 'Failed to create recording');
+                  }
+                  const data = await metaRes.json();
+                  setSubmissionStatus('success');
+                  setSubmissionMessage(`✓ Saved successfully! Recording ID: ${data.recordingId}`);
+                  setTimeout(() => setSubmissionStatus(null), 4000);
+                } catch (err) {
+                  console.error(err);
+                  setSubmissionStatus('error');
+                  setSubmissionMessage(`✗ Error: ${err.message || 'Save failed'}`);
+                }
+                setIsSubmitting(false);
+              }}
+              disabled={isSubmitting}
+              className={`px-8 py-3 font-semibold rounded-xl shadow-lg transition-all transform flex items-center gap-2 ${
+                isSubmitting 
+                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white hover:scale-[1.02] active:scale-[0.98]'
+              }`}
+            >
+              {isSubmitting ? (
+                <>
+                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  Submit Recording
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -1,36 +1,58 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useForm } from "react-hook-form";
+import { useEffect, useState } from "react";
 import Logo from "../assets/Logo.jpeg";
+
+// استبدل هذا بـ Google Client ID الخاص بك
+const GOOGLE_CLIENT_ID = '694856927034-9mjh5nn6ifosdtbq9g1ms1hae60t0n96.apps.googleusercontent.com';
 
 function SignIn() {
   const navigate = useNavigate();
   const { loginWithEmail, loginWithGoogle } = useAuth();
+  const [googleReady, setGoogleReady] = useState(false);
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm({ defaultValues: { email: "", password: "" } });
 
-  async function onSubmit(values) {
-    try {
-      // backend now returns correct role
-      const user = await loginWithEmail(values);
-
-      // navigate directly to role-based dashboard
-      if (user?.role) {
-        navigate(`/${user.role}/dashboard`, { replace: true });
-      } else {
-        // fallback in case role is missing
-        navigate("/", { replace: true });
+  useEffect(() => {
+    // Initialize Google Sign-In
+    const initializeGoogle = async () => {
+      if (window.google && !googleReady) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleCredentialResponse,
+        });
+        setGoogleReady(true);
+        
+        // Render the button
+        const buttonContainer = document.getElementById('google-signin-button');
+        if (buttonContainer) {
+          window.google.accounts.id.renderButton(buttonContainer, {
+            theme: 'outline',
+            size: 'large',
+            width: '100%',
+            text: 'signin_with'
+          });
+        }
       }
-    } catch (err) {
-      alert(err?.message || "Login failed");
-    }
-  }
+    };
 
-  async function handleGoogleSignIn() {
+    // Add a small delay to ensure Google script is loaded
+    setTimeout(initializeGoogle, 100);
+  }, [googleReady]);
+
+  async function handleCredentialResponse(response) {
     try {
+      if (!response?.credential) {
+        throw new Error('No credential received from Google');
+      }
+
+      // Store the token for the AuthContext to use
+      window.googleAuthToken = response.credential;
+      
       const user = await loginWithGoogle();
       if (user?.role) {
         navigate(`/${user.role}/dashboard`, { replace: true });
@@ -38,7 +60,21 @@ function SignIn() {
         navigate("/", { replace: true });
       }
     } catch (err) {
-      alert(err?.message || "Google sign-in failed");
+      console.error('Google auth error:', err);
+      alert(err?.message || "فشل تسجيل الدخول عبر جوجل");
+    }
+  }
+
+  async function onSubmit(values) {
+    try {
+      const user = await loginWithEmail(values);
+      if (user?.role) {
+        navigate(`/${user.role}/dashboard`, { replace: true });
+      } else {
+        navigate("/", { replace: true });
+      }
+    } catch (err) {
+      alert(err?.message || "فشل تسجيل الدخول");
     }
   }
 
@@ -94,13 +130,7 @@ function SignIn() {
 
             <div className="divider">OR</div>
 
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              className="btn btn-outline w-full hover:scale-105 transition-transform"
-            >
-              Sign in with Google
-            </button>
+            <div id="google-signin-button" className="w-full flex justify-center"></div>
 
             <p className="text-center text-sm text-base-content/60 mt-4">
               Don't have an account? <Link to="/signup" className="link link-primary">Sign Up</Link>

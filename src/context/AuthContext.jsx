@@ -98,20 +98,50 @@ export function AuthProvider({ children }) {
   }
 
   async function loginWithGoogle() {
-    // Mock Google OAuth - simulate a Google user
-    await new Promise((r) => setTimeout(r, 500));
-    const mockGoogleEmail = `google.user.${Math.random().toString(36).slice(2)}@gmail.com`;
-    const session = {
-      token: `mock_${Math.random().toString(36).slice(2)}`,
-      expiresAt: getNowMs() + TOKEN_LIFETIME_MS,
-      user: { email: mockGoogleEmail, role: "admin" }
-    };
-    setUser(session.user);
-    setToken(session.token);
-    setExpiresAt(session.expiresAt);
-    persistSession(session);
-    scheduleRefresh(session.expiresAt);
-    return session.user;
+    try {
+      // Get the Google token from the window object (set by GoogleLogin component)
+      const token = window.googleAuthToken;
+      
+      if (!token) {
+        throw new Error("Google authentication failed. Please try again.");
+      }
+
+      const res = await fetch("http://localhost:3000/api/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Google login failed");
+      }
+
+      const data = await res.json();
+
+      // Create session with backend data
+      const session = {
+        token: data.token,
+        expiresAt: getNowMs() + TOKEN_LIFETIME_MS,
+        user: {
+          email: data.user?.email,
+          role: data.role,
+          id: data.user?.id,
+          name: data.user?.name
+        },
+      };
+
+      setUser(session.user);
+      setToken(session.token);
+      setExpiresAt(session.expiresAt);
+      persistSession(session);
+      scheduleRefresh(session.expiresAt);
+
+      return session.user;
+    } catch (err) {
+      console.error("Google login error:", err);
+      throw new Error(err.message || "Google login failed");
+    }
   }
 
   // Keep login as alias for backward compatibility

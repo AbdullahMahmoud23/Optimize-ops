@@ -280,8 +280,15 @@ function RecordAudio() {
                                 body: fd
                               });
                               if (!resp.ok) {
-                                const err = await resp.text().catch(() => 'upload failed');
-                                alert('Upload failed: ' + err);
+                                let errorMsg = 'Upload failed';
+                                try {
+                                  const errData = await resp.json();
+                                  errorMsg = errData.error || errData.details || errorMsg;
+                                } catch (e) {
+                                  const errText = await resp.text();
+                                  errorMsg = errText || errorMsg;
+                                }
+                                alert('Upload failed: ' + errorMsg);
                               } else {
                                 const j = await resp.json().catch(() => ({}));
                                 alert(j.message || 'Uploaded successfully');
@@ -290,7 +297,7 @@ function RecordAudio() {
                               }
                             } catch (uploadErr) {
                               console.error('Upload error', uploadErr);
-                              alert('Upload error');
+                              alert('Upload error: ' + (uploadErr.message || uploadErr));
                             }
                           };
                           mediaRecorderRef.current.start();
@@ -377,37 +384,18 @@ function RecordAudio() {
                   const data = await metaRes.json();
                   setSubmissionStatus('success');
                   setSubmissionMessage(`✓ Saved successfully! Recording ID: ${data.recordingId}`);
-                  setTimeout(() => setSubmissionStatus(null), 4000);
                 } catch (err) {
-                  console.error(err);
+                  console.error('Submission error:', err);
                   setSubmissionStatus('error');
-                  setSubmissionMessage(`✗ Error: ${err.message || 'Save failed'}`);
+                  setSubmissionMessage(err.message || 'Submission failed');
+                } finally {
+                  setIsSubmitting(false);
                 }
-                setIsSubmitting(false);
               }}
               disabled={isSubmitting}
-              className={`px-8 py-3 font-semibold rounded-xl shadow-lg transition-all transform flex items-center gap-2 ${
-                isSubmitting 
-                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
-                  : 'bg-indigo-600 hover:bg-indigo-700 text-white hover:scale-[1.02] active:scale-[0.98]'
-              }`}
+              className="px-8 py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-colors"
             >
-              {isSubmitting ? (
-                <>
-                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  Submit Recording
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                </>
-              )}
+              {isSubmitting ? 'Submitting...' : 'Submit Recording'}
             </button>
           </div>
         </div>

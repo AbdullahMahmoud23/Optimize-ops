@@ -7,6 +7,20 @@ const speech = require('@google-cloud/speech');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const path = require('path');
+let ffmpeg;
+try {
+  ffmpeg = require('fluent-ffmpeg');
+  // Try to use ffmpeg-static if available
+  try {
+    const ffmpegStatic = require('ffmpeg-static');
+    ffmpeg.setFfmpegPath(ffmpegStatic);
+  } catch (e) {
+    // ffmpeg-static not available, will try system ffmpeg
+  }
+} catch (e) {
+  console.warn('⚠️  fluent-ffmpeg not installed. MP3 conversion disabled.');
+  ffmpeg = null;
+}
 require('dotenv').config();
 
 const app = express();
@@ -34,9 +48,19 @@ const upload = multer({ dest: 'uploads/' });
 // Middleware للتحقق من JWT
 const verifyToken = (req, res, next) => {
   const token = req.headers['authorization'];
-  if (!token) return res.status(403).send('No token provided');
+  if (!token) {
+    console.warn('⚠️  No token provided');
+    return res.status(403).json({ error: 'No token provided' });
+  }
   jwt.verify(token, 'your_secret_key', (err, decoded) => {
-    if (err) return res.status(401).send('Invalid token');
+    if (err) {
+      console.warn('⚠️  Invalid token:', err.message);
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    if (!decoded.id) {
+      console.warn('⚠️  Token missing id field');
+      return res.status(401).json({ error: 'Token missing id field' });
+    }
     req.userId = decoded.id;
     next();
   });
@@ -249,15 +273,43 @@ app.get('/api/recordings/:id', verifyToken, async (req, res) => {
 app.post('/api/recordings/metadata', verifyToken, async (req, res) => {
   try {
     const { shift, type, date } = req.body; // date optional (YYYY-MM-DD)
-    // Insert into Recordings; CreatedAt will default to NOW() if column set accordingly
-    const sql = 'INSERT INTO Recordings (OperatorID, Shift, Type, AudioPath, Transcript, CreatedAt) VALUES (?, ?, ?, NULL, NULL, ? )';
-    // If date provided, use that as CreatedAt else use NOW()
-    const createdAt = date ? date + ' 00:00:00' : new Date();
-    const [result] = await db.promise().query(sql, [req.userId, shift || null, type || null, createdAt]);
-    return res.json({ ok: true, recordingId: result.insertId });
+    console.log('[DEBUG] /api/recordings/metadata - received:', { userId: req.userId, shift, type, date });
+    
+    // Try to insert with CreatedAt
+    let sql = 'INSERT INTO Recordings (OperatorID, Shift, Type, AudioPath, Transcript, CreatedAt) VALUES (?, ?, ?, NULL, NULL, ?)';
+    let createdAt = date ? date + ' 00:00:00' : new Date();
+    let params = [req.userId, shift || null, type || null, createdAt];
+    
+    console.log('[DEBUG] Trying query:', sql, 'with params:', params);
+    
+    try {
+      const [result] = await db.promise().query(sql, params);
+      console.log('[DEBUG] ✓ Insert successful, recordingId:', result.insertId);
+      return res.json({ ok: true, recordingId: result.insertId });
+    } catch (err1) {
+      // If CreatedAt column doesn't exist, try without it
+      console.warn('[WARN] CreatedAt error:', err1.code, err1.message);
+      sql = 'INSERT INTO Recordings (OperatorID, Shift, Type, AudioPath, Transcript) VALUES (?, ?, ?, NULL, NULL)';
+      params = [req.userId, shift || null, type || null];
+      
+      console.log('[DEBUG] Retrying without CreatedAt:', sql, 'with params:', params);
+      
+      const [result] = await db.promise().query(sql, params);
+      console.log('[DEBUG] ✓ Retry successful, recordingId:', result.insertId);
+      return res.json({ ok: true, recordingId: result.insertId });
+    }
   } catch (err) {
-    console.error('Error creating recording metadata:', err);
-    return res.status(500).json({ error: 'Error creating recording metadata' });
+    console.error('[ERROR] Recording metadata creation failed:', {
+      code: err.code,
+      message: err.message,
+      sql: err.sql,
+      errno: err.errno
+    });
+    return res.status(500).json({ 
+      error: 'Error creating recording metadata',
+      details: err.message,
+      code: err.code
+    });
   }
 });
 
@@ -396,11 +448,16 @@ app.post('/api/login', async (req, res) => {
 
 // API لرفع التسجيلات الصوتية
 app.post('/api/recordings', verifyToken, upload.single('audio'), async (req, res) => {
-  const { shift, type } = req.body;
-  const audioPath = req.file.path;
-  const operatorId = req.userId;
-
   try {
+    // Validate file upload
+    if (!req.file) {
+      return res.status(400).json({ error: 'No audio file uploaded' });
+    }
+
+    const { shift, type } = req.body;
+    const audioPath = req.file.path;
+    const operatorId = req.userId;
+
     // If file is not WAV/LINEAR16, skip transcription and save file only
     const mimetype = req.file.mimetype || '';
     let transcript = null;
@@ -422,8 +479,39 @@ app.post('/api/recordings', verifyToken, upload.single('audio'), async (req, res
 
     // Insert recording (use promise API)
     const insertSql = 'INSERT INTO Recordings (OperatorID, Shift, Type, Transcript, AudioPath) VALUES (?, ?, ?, ?, ?)';
-    const [result] = await db.promise().query(insertSql, [operatorId, shift, type, transcript, audioPath]);
-    const recordingId = result.insertId;
+    let recordingId;
+    try {
+      const [result] = await db.promise().query(insertSql, [operatorId, shift, type, transcript, audioPath]);
+      recordingId = result.insertId;
+      console.log(`✓ Recording saved with ID: ${recordingId}`);
+    } catch (dbErr) {
+      console.error('Database error:', dbErr.message);
+      return res.status(500).json({ 
+        error: 'Database error: ' + (dbErr.message || 'Failed to save recording'),
+        details: dbErr.code 
+      });
+    }
+
+    // Convert to MP3 if ffmpeg is available
+    if (ffmpeg) {
+      const mp3Dir = path.join(__dirname, 'uploads', 'mp3');
+      if (!fs.existsSync(mp3Dir)) {
+        fs.mkdirSync(mp3Dir, { recursive: true });
+      }
+      const mp3Path = path.join(mp3Dir, `recording_${recordingId}.mp3`);
+      ffmpeg(audioPath)
+        .audioBitrate('192k')
+        .audioChannels(2)
+        .audioCodec('libmp3lame')
+        .output(mp3Path)
+        .on('end', () => {
+          console.log(`✓ MP3 created: ${mp3Path}`);
+        })
+        .on('error', (err) => {
+          console.warn(`⚠️  MP3 conversion failed for recording ${recordingId}:`, err.message);
+        })
+        .run();
+    }
 
     // Simple automatic evaluation (example)
     const score = transcript && transcript.includes('إنجاز') ? 90 : 60;
@@ -440,7 +528,10 @@ app.post('/api/recordings', verifyToken, upload.single('audio'), async (req, res
     }
   } catch (error) {
     console.error('Error processing audio upload:', error);
-    res.status(500).send('Error processing audio');
+    res.status(500).json({ 
+      error: 'Error processing audio',
+      details: error.message 
+    });
   }
 });
 

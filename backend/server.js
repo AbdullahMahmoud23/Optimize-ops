@@ -62,113 +62,113 @@ const verifyToken = (req, res, next) => {
 // ------------------ API ROUTES -----------------
 //================================================
 // Google OAuth Login Endpoint
-// app.post("/api/auth/google", async (req, res) => {
-//   try {
-//     const { token } = req.body;
+app.post("/api/auth/google", async (req, res) => {
+  try {
+    const { token } = req.body;
 
-//     if (!token) {
-//       return res.status(400).json({ error: "Token is required" });
-//     }
+    if (!token) {
+      return res.status(400).json({ error: "Token is required" });
+    }
 
-//     // Verify the Google token
-//     const ticket = await googleClient.verifyIdToken({
-//       idToken: token,
-//       audience: GOOGLE_CLIENT_ID,
-//     });
+    // Verify the Google token
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: GOOGLE_CLIENT_ID,
+    });
 
-//     const payload = ticket.getPayload();
-//     const email = payload.email;
-//     const googleId = payload.sub;
-//     const name = payload.name;
+    const payload = ticket.getPayload();
+    const email = payload.email;
+    const googleId = payload.sub;
+    const name = payload.name;
 
-//     console.log("=== GOOGLE LOGIN ===");
-//     console.log("Email:", email);
-//     console.log("Google ID:", googleId);
+    console.log("=== GOOGLE LOGIN ===");
+    console.log("Email:", email);
+    console.log("Google ID:", googleId);
 
-//     // Check if user exists in database, if not create them
-//     let [results] = await db
-//       .promise()
-//       .query("SELECT * FROM operators WHERE Email = ?", [email]);
+    // Check if user exists in database, if not create them
+    let [results] = await db
+      .promise()
+      .query("SELECT * FROM operators WHERE Email = ?", [email]);
 
-//     let userId;
-//     if (results.length === 0) {
-//       // Create new user. Try inserting GoogleID; if the column doesn't exist, fallback.
-//       let insertResult;
-//       try {
-//         [insertResult] = await db
-//           .promise()
-//           .query(
-//             "INSERT INTO operators (Email, Password, GoogleID) VALUES (?, ?, ?)",
-//             [email, "google_oauth", googleId]
-//           );
-//       } catch (err) {
-//         // ER_BAD_FIELD_ERROR => unknown column (schema missing GoogleID)
-//         if (err && err.code === "ER_BAD_FIELD_ERROR") {
-//           console.warn(
-//             "GoogleID column not found in operators table, inserting without it"
-//           );
-//           [insertResult] = await db
-//             .promise()
-//             .query("INSERT INTO operators (Email, Password) VALUES (?, ?)", [
-//               email,
-//               "google_oauth",
-//             ]);
-//         } else {
-//           throw err;
-//         }
-//       }
-//       userId = insertResult.insertId;
-//       console.log("✓ New user created via Google");
-//     } else {
-//       userId = results[0].OperatorID;
-//       // Update Google ID if not set
-//       if (!results[0].GoogleID) {
-//         try {
-//           await db
-//             .promise()
-//             .query("UPDATE operators SET GoogleID = ? WHERE Email = ?", [
-//               googleId,
-//               email,
-//             ]);
-//         } catch (err) {
-//           if (err && err.code === "ER_BAD_FIELD_ERROR") {
-//             console.warn("GoogleID column not found; skipping update");
-//           } else {
-//             throw err;
-//           }
-//         }
-//       }
-//       console.log("✓ Existing user logged in via Google");
-//     }
+    let userId;
+    if (results.length === 0) {
+      // Create new user. Try inserting GoogleID; if the column doesn't exist, fallback.
+      let insertResult;
+      try {
+        [insertResult] = await db
+          .promise()
+          .query(
+            "INSERT INTO operators (Email, Password, GoogleID) VALUES (?, ?, ?)",
+            [email, "google_oauth", googleId]
+          );
+      } catch (err) {
+        // ER_BAD_FIELD_ERROR => unknown column (schema missing GoogleID)
+        if (err && err.code === "ER_BAD_FIELD_ERROR") {
+          console.warn(
+            "GoogleID column not found in operators table, inserting without it"
+          );
+          [insertResult] = await db
+            .promise()
+            .query("INSERT INTO operators (Email, Password) VALUES (?, ?)", [
+              email,
+              "google_oauth",
+            ]);
+        } else {
+          throw err;
+        }
+      }
+      userId = insertResult.insertId;
+      console.log("✓ New user created via Google");
+    } else {
+      userId = results[0].OperatorID;
+      // Update Google ID if not set
+      if (!results[0].GoogleID) {
+        try {
+          await db
+            .promise()
+            .query("UPDATE operators SET GoogleID = ? WHERE Email = ?", [
+              googleId,
+              email,
+            ]);
+        } catch (err) {
+          if (err && err.code === "ER_BAD_FIELD_ERROR") {
+            console.warn("GoogleID column not found; skipping update");
+          } else {
+            throw err;
+          }
+        }
+      }
+      console.log("✓ Existing user logged in via Google");
+    }
 
-//     // Create JWT token
-//     const jwtToken = jwt.sign(
-//       { id: userId, role: "technician", email: email },
-//       "your_secret_key",
-//       { expiresIn: "24h" }
-//     );
+    // Create JWT token
+    const jwtToken = jwt.sign(
+      { id: userId, role: "technician", email: email },
+      "your_secret_key",
+      { expiresIn: "24h" }
+    );
 
-//     return res.json({
-//       token: jwtToken,
-//       role: "technician",
-//       user: { id: userId, email: email, name: name },
-//     });
-//   } catch (error) {
-//     // Log full error for debugging (development only)
-//     console.error(
-//       "Google auth error:",
-//       error && error.message ? error.message : error
-//     );
-//     console.error(error && error.stack ? error.stack : "no-stack");
-//     // Return error message to client to help debugging locally
-//     return res
-//       .status(401)
-//       .json({
-//         error: "Invalid token or authentication failed",
-//         details: error && error.message ? error.message : null,
-//       });
-//   }
-// });
+    return res.json({
+      token: jwtToken,
+      role: "technician",
+      user: { id: userId, email: email, name: name },
+    });
+  } catch (error) {
+    // Log full error for debugging (development only)
+    console.error(
+      "Google auth error:",
+      error && error.message ? error.message : error
+    );
+    console.error(error && error.stack ? error.stack : "no-stack");
+    // Return error message to client to help debugging locally
+    return res
+      .status(401)
+      .json({
+        error: "Invalid token or authentication failed",
+        details: error && error.message ? error.message : null,
+      });
+  }
+});
 
 app.post("/api/signup", (req, res) => {
   const { email, password } = req.body;

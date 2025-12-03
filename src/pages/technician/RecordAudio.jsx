@@ -7,6 +7,7 @@ function RecordAudio() {
   const { token } = useAuth();
   const [achievementValue, setAchievementValue] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [currentRecordingId, setCurrentRecordingId] = useState(null);
   const [recordingTime, setRecordingTime] = useState('0:00');
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
@@ -284,13 +285,14 @@ function RecordAudio() {
                                 try {
                                   const errData = await resp.json();
                                   errorMsg = errData.error || errData.details || errorMsg;
-                                } catch (e) {
+                                } catch {
                                   const errText = await resp.text();
                                   errorMsg = errText || errorMsg;
                                 }
                                 alert('Upload failed: ' + errorMsg);
                               } else {
                                 const j = await resp.json().catch(() => ({}));
+                                if (j.recordingId) setCurrentRecordingId(j.recordingId);
                                 alert(j.message || 'Uploaded successfully');
                                 // mark final step complete
                                 setStepIndex(3);
@@ -369,6 +371,7 @@ function RecordAudio() {
                   if (!achRes.ok) throw new Error('Failed to save achievement');
 
                   // Create recording metadata (date & shift)
+                  /*
                   const metaRes = await fetch('http://localhost:3000/api/recordings/metadata', {
                     method: 'POST',
                     headers: {
@@ -382,8 +385,11 @@ function RecordAudio() {
                     throw new Error(err.error || 'Failed to create recording');
                   }
                   const data = await metaRes.json();
+                */
+                  const msg = currentRecordingId  ? `✓ Saved successfully! Recording ID: ${currentRecordingId}` : `✓ Daily report submitted successfully!`;
+                  
                   setSubmissionStatus('success');
-                  setSubmissionMessage(`✓ Saved successfully! Recording ID: ${data.recordingId}`);
+                  setSubmissionMessage(msg); //  Recording ID: ${data.recordingId}
                 } catch (err) {
                   console.error('Submission error:', err);
                   setSubmissionStatus('error');

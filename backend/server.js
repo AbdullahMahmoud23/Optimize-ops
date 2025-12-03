@@ -504,7 +504,7 @@ app.post(
 
       const originalPath = req.file.path;
       const newPath = `${req.file.path}${extension}`;
-      
+
       // Rename file so Groq recognizes it
       fs.renameSync(originalPath, newPath);
 
@@ -515,11 +515,11 @@ app.post(
 
       let aiAnalysis = { score: 50, details: "No transcript detected", tasks: [] };
       if (transcript) {
-          aiAnalysis = await analyzePerformance(transcript);
+        aiAnalysis = await analyzePerformance(transcript);
       }
 
       // --- SAVE TO DATABASE ---
-      
+
       // A. Save Recording
       const insertRecSql = "INSERT INTO Recordings (OperatorID, Shift, Type, Transcript, AudioPath) VALUES (?, ?, ?, ?, ?)";
       const [recResult] = await db.promise().query(insertRecSql, [operatorId, shift, type, transcript, newPath]);
@@ -542,7 +542,7 @@ app.post(
       if (ffmpeg) {
         const mp3Dir = path.join(__dirname, "uploads", "mp3");
         if (!fs.existsSync(mp3Dir)) fs.mkdirSync(mp3Dir, { recursive: true });
-        
+
         const mp3Path = path.join(mp3Dir, `recording_${recordingId}.mp3`);
         ffmpeg(newPath)
           .audioBitrate("128k")
@@ -591,12 +591,3 @@ app.get("/api/stops", verifyToken, (req, res) => {
 // Start Server
 const PORT = 3000;
 app.listen(PORT, () => console.log("Backend running on port 3000"));
-
-/*
-
-تمام يا بشمهندس، أنا خلصت صيانة المكنة رقم خمسة، وغيرت الزيت والسيور، والمكنة شغالة زي الفل.
-أنا وصلت الأوردر للعميل في المعادي، واستلمت المبلغ كاش، وحالياً أنا راجع على المخزن عشان أسلم العهده.
-النهاردة خلصت تقرير المبيعات الشهري وبعته للإدارة.اشتغلت النهاردة حوالي 8 ساعات في المكتب.
-فيه مشكلة كبيرة النهاردة. العربية عطلت مني على الطريق الدائري والونش اتأخر، فمعرفتش أكمل باقي الشغل.
-أنا سلمت الوردية لزميلي أحمد، وكل حاجة تمام ومفيش أي مشاكل واجهتنا طول اليوم.
-*/
